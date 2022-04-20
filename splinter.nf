@@ -33,28 +33,21 @@ Channel
 	.ifEmpty{ exit 1, "No reference genome was selected. Set with 'params.reference'"}
 	.set { reference_genome } 
 
-//workFiles
-	//.combine(reference_genome)
-	//.set {alignments_with_reference}
-
 fasta_ref = file(params.reference)
 
 process freyja_variants {
 	publishDir "${params.outdir}/freyja_reports/variants/", mode: 'copy', pattern:'*'
-	//publishDir "$outdir/freyja_reports/depths/"
 
 	input:
 	file(alignments) from workFiles
 	file fasta_ref
-	//file (reference) from reference_genome
-
 
 	output:
-	file("*") into variants_out
+	file("*_final.tsv") into variants_out
 
 	shell:
 	s_name = alignments.baseName
-	//fasta_ref = file(params.reference)
+
 	"""
 	freyja variants !{s_name}.bam --variants !{s_name}_freyja_variants.tsv --depths !{s_name}_freyja_depths --ref !{fasta_ref}
 	freyja demix !{s_name}_freyja_variants.tsv !{s_name}_freyja_depths --output !{s_name}_final.tsv
@@ -64,19 +57,23 @@ process freyja_variants {
 }
 
 
-//process freyja_demix {
-	//tag "$name"
-	//publishDir "$outdir/freyja_reports/"
+process freyja_aggregate {
+	publishDir "${params.outdir}", mode: 'copy'
+	
+	input:
+	file(variants) from variants_out.collect()
 
-	//input:
-	//tuple name, file(vars) from variants_out
-	//tuple name, file(depths) from depths_out
+	output:
+	file("aggregated_results.tsv")
 
-	//output:
-	//file "${name}_final.tsv"
+	shell:
+	"""
+	mkdir tmp
 
-	//script:
-	//"""
-	//freyja demix ${vars} ${depths} --output "${name}_final.tsv"
-	//"""
-//}
+	mv !{variants} tmp/.
+
+	freyja aggregate tmp/ --output aggregated_results.tsv 
+	freyja plot aggregated_results.tsv --output aggregated_plot.pdf
+	"""
+
+}
